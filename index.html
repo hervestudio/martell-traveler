@@ -40,6 +40,33 @@
       text-shadow: 0 2px 12px rgba(0,0,0,.6); letter-spacing: 1px;
     }
 
+    /* ---- Toggle couleur (interrupteur coulissant) ---- */
+    #colorToggle {
+      position: fixed; left: 18px; bottom: 64px; z-index: 11;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px;
+      color: rgba(246,241,227,.7); background: rgba(16,24,52,.55);
+      border: 1px solid rgba(246,241,227,.18); padding: 7px 14px 7px 8px; border-radius: 24px;
+      cursor: pointer; user-select: none; display: flex; align-items: center; gap: 10px;
+      backdrop-filter: blur(4px); transition: color .2s ease, border-color .2s ease;
+    }
+    #colorToggle .switch {
+      position: relative; width: 44px; height: 23px; border-radius: 12px; flex: none;
+      background: rgba(246,241,227,.22); transition: background .25s ease;
+    }
+    #colorToggle .knob {
+      position: absolute; top: 2.5px; left: 2.5px; width: 18px; height: 18px; border-radius: 50%;
+      background: #f6f1e3; transition: left .25s cubic-bezier(.4,1.3,.5,1), background .25s ease;
+      display: grid; place-items: center;
+    }
+    #colorToggle .knob::after {
+      content: "\2715"; font-size: 10px; line-height: 1; font-weight: 700; color: #8a8a93;
+    }
+    #colorToggle.on { color: #ffe6a8; border-color: rgba(255,217,138,.6); }
+    #colorToggle.on .switch { background: #e9c30d; }
+    #colorToggle.on .knob { left: 23.5px; }
+    #colorToggle.on .knob::after { content: "\2713"; color: #9a7c08; }
+    #colorToggle .state { min-width: 22px; opacity: .85; }
+
     /* ---- Loading ---- */
     #loader {
       position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
@@ -70,6 +97,12 @@
   </div>
 
   <div id="score">Sphères : 0 / 0</div>
+
+  <button id="colorToggle" title="Le perso prend la couleur de la dernière sphère mangée">
+    <span class="switch"><span class="knob"></span></span>
+    <span>Couleur sphère</span>
+    <span class="state">OFF</span>
+  </button>
 
   <div id="loader">MARTELL</div>
 

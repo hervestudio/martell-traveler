@@ -404,6 +404,12 @@ function makeSphereMaterial(ci) {
   });
 }
 
+// couleur d'une sphère selon le mode de matériau et son index de couleur
+function sphereColorHex(s) {
+  if (params.sphMode === 'métallisé') return [params.metColor1, params.metColor2, params.metColor3][s.ci];
+  return [params.emColor1, params.emColor2, params.emColor3][s.ci];
+}
+
 function buildSpheres() {
   for (const s of spheres) { sphereGroup.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); }
   spheres = [];
@@ -573,6 +579,22 @@ fBulle.add(params, 'sphPhysThickness', 0, 4, 0.05).name('épaisseur (réfraction
 // ============================================================
 let paused = false;
 let followCam = true;
+
+// Toggle "couleur" : si actif, le perso prend la couleur de la dernière sphère mangée.
+let colorMode = false;
+const colorToggle = document.getElementById('colorToggle');
+const colorSwitch = colorToggle.querySelector('.switch');
+const colorState = colorToggle.querySelector('.state');
+colorToggle.addEventListener('click', () => {
+  colorMode = !colorMode;
+  colorToggle.classList.toggle('on', colorMode);
+  colorState.textContent = colorMode ? 'ON' : 'OFF';
+  if (!colorMode) {
+    traveler.setColor(params.color);   // retour à la couleur de base (#ffc83d)
+    colorSwitch.style.background = '';
+  }
+});
+
 addEventListener('keydown', (e) => {
   if (e.code === 'Space') { paused = !paused; e.preventDefault(); }
   else if (e.key === 'c' || e.key === 'C') {
@@ -663,6 +685,11 @@ function tick() {
         s.startY = s.mesh.position.y;          // part de sa hauteur actuelle (pas de saut)
         emissionBoostT = EMISSION_BOOST_DUR;   // flash d'émission du perso
         traveler.triggerPulse();               // onde de turbulence sur les splines
+        if (colorMode) {                       // le perso prend la couleur de la sphère
+          const hex = sphereColorHex(s);
+          traveler.setColor(hex);
+          colorSwitch.style.background = hex;  // la piste reflète la couleur prise
+        }
       }
     }
     if (scoreEl) scoreEl.textContent = `Sphères : ${collected} / ${spheres.length}`;
