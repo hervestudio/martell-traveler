@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MARTELL — The Journey</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #060b22; }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+
+    /* ---- Brand overlay (key-visual style) ---- */
+    .brand {
+      position: fixed; top: 38px; left: 0; right: 0;
+      display: flex; flex-direction: column; align-items: center;
+      pointer-events: none; z-index: 10;
+      font-family: "Times New Roman", Georgia, serif;
+      color: #f6f1e3;
+      text-shadow: 0 2px 24px rgba(0,0,0,.55);
+    }
+    .brand .mark { font-size: 13px; letter-spacing: 2px; opacity: .85; margin-bottom: 6px; }
+    .brand .name { font-size: 40px; letter-spacing: 14px; font-weight: 500; padding-left: 14px; }
+    .brand .sub  { font-size: 11px; letter-spacing: 8px; opacity: .7; margin-top: 4px; padding-left: 8px; }
+
+    /* ---- Controls hint ---- */
+    .hint {
+      position: fixed; left: 18px; bottom: 16px; z-index: 10;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 11px; line-height: 1.7; color: rgba(246,241,227,.6);
+      pointer-events: none; user-select: none;
+    }
+    .hint b { color: #ffe6a8; font-weight: 600; }
+
+    /* ---- Score ---- */
+    #score {
+      position: fixed; left: 18px; top: 18px; z-index: 10;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 15px; color: #ffd98a; pointer-events: none; user-select: none;
+      text-shadow: 0 2px 12px rgba(0,0,0,.6); letter-spacing: 1px;
+    }
+
+    /* ---- Loading ---- */
+    #loader {
+      position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+      background: #060b22; transition: opacity .8s ease; color: #f6f1e3;
+      font-family: "Times New Roman", serif; letter-spacing: 10px; font-size: 22px;
+      text-align: center; padding: 30px;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    #loader.error {
+      font-family: ui-monospace, Consolas, monospace; font-size: 13px;
+      letter-spacing: 0; color: #ff9b9b; white-space: pre-wrap; line-height: 1.6;
+      align-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div class="brand">
+    <div class="mark">✶</div>
+    <div class="name">MARTELL</div>
+    <div class="sub">THE&nbsp;JOURNEY</div>
+  </div>
+
+  <div class="hint">
+    <div><b>C</b> — caméra libre / suivi &nbsp;·&nbsp; <b>Espace</b> — pause</div>
+    <div>Panneau en haut à droite pour régler chemin &amp; personnage</div>
+  </div>
+
+  <div id="score">Sphères : 0 / 0</div>
+
+  <div id="loader">MARTELL</div>
+
+  <!-- Affiche toute erreur à l'écran au lieu de rester bloqué sur le loader -->
+  <script>
+    function showError(msg) {
+      var l = document.getElementById('loader');
+      if (!l) return;
+      if (l.classList.contains('error')) return;   // ne pas écraser une stack déjà affichée
+      l.classList.remove('hidden');
+      l.classList.add('error');
+      l.textContent = '⚠ Erreur de chargement\n\n' + msg +
+        '\n\nOuvre la console (F12) pour le détail.';
+    }
+    window.addEventListener('error', function (e) {
+      showError((e.message || 'erreur') + (e.filename ? '\n' + e.filename + ':' + e.lineno : ''));
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      showError('Promise rejetée : ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+    });
+  </script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
