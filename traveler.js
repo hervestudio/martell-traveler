@@ -155,7 +155,7 @@ export class Traveler {
       const pts = f.pts;
       pts.length = 0;
       const jEnd = Math.floor(tubeMax * f.grow);   // longueur courante (se construit du point commun)
-      for (let j = 0; j <= jEnd; j += 2) {
+      for (let j = 0; j <= jEnd; j += 1) {         // pas de 1 -> plus de points, courbe plus souple
         const histIndex = Math.min(hist.length - 1, Math.floor(j * this.spacing));
         const sample = hist[histIndex];
 
@@ -197,7 +197,7 @@ export class Traveler {
       if (pts.length >= 3) {
         // type 'catmullrom' (uniforme) : pas de distanceToSquared -> robuste
         const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
-        const tube = new THREE.TubeGeometry(curve, Math.max(8, pts.length * 2), this.radius, 6, false);
+        const tube = new THREE.TubeGeometry(curve, Math.max(12, pts.length), this.radius, 8, false);
         f.mesh.geometry.dispose();
         f.mesh.geometry = tube;
       }

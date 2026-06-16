@@ -90,6 +90,8 @@ const params = {
   pulseDur:    0.5,    // turbulence : durée/vitesse (plus grand = plus lent)
   pulseWidth:  0.3,    // turbulence : largeur du renflement
   growDur:     3.0,    // durée d'apparition d'une nouvelle ligne (s)
+  speedBoost:  0.4,    // accélération à la récupération (surplus relatif)
+  speedBoostDur: 1.5,  // durée de l'accélération (s)
 
   // --- Personnage : placement (décalage par rapport au chemin) ---
   offsetX:     0.0,
@@ -99,9 +101,9 @@ const params = {
   // --- Personnage : visuel ---
   color:     '#ffc83d',
   thickness: 0.05,     // épaisseur de départ des filaments (unités monde)
-  thicknessMax: 0.17,  // épaisseur atteinte quand toutes les sphères sont récupérées
+  thicknessMax: 0.1,   // épaisseur atteinte quand toutes les sphères sont récupérées
   emission:  1.0,      // intensité d'émission des filaments
-  emissionBoost: 0.6,  // surplus d'émission quand le perso mange une sphère
+  emissionBoost: 1.7,  // surplus d'émission quand le perso mange une sphère
   glowChar:   0.3,     // force du bloom du personnage
   glowCharRadius: 0.2,
   exposure:  0.85,
@@ -146,6 +148,7 @@ let runTime = 0;
 let snapCam = false;
 let emissionBoostT = 0;   // temps restant du boost d'émission (récupération)
 const EMISSION_BOOST_DUR = 0.3;
+let speedBoostT = 0;      // temps restant du boost de vitesse (récupération)
 
 // ============================================================
 //  Ciel dégradé
@@ -528,6 +531,8 @@ fAtt.add(params, 'pulseAmp', 0, 2, 0.05).name('turbulence ampl.').onChange(v => 
 fAtt.add(params, 'pulseDur', 0.2, 3, 0.05).name('turbulence durée').onChange(v => traveler.pulseDur = v);
 fAtt.add(params, 'pulseWidth', 0.05, 0.6, 0.01).name('turbulence largeur').onChange(v => traveler.pulseWidth = v);
 fAtt.add(params, 'growDur', 0.1, 5, 0.05).name('apparition fil (s)').onChange(v => traveler.growDur = v);
+fAtt.add(params, 'speedBoost', 0, 3, 0.05).name('accél. récup.');
+fAtt.add(params, 'speedBoostDur', 0.1, 2, 0.05).name('accél. durée (s)');
 
 const fPos = gui.addFolder('Personnage — placement');
 fPos.add(params, 'offsetX', -12, 12, 0.1).name('décalage X');
@@ -623,7 +628,9 @@ function tick() {
 
     if (!paused) {
       runTime += dt;
-      const speed = Math.min(params.maxSpeed, params.startSpeed + runTime * params.accel);
+      if (speedBoostT > 0) speedBoostT = Math.max(0, speedBoostT - dt);
+      const sBoost = 1 + params.speedBoost * (speedBoostT / params.speedBoostDur);  // accélération récup.
+      const speed = Math.min(params.maxSpeed, params.startSpeed + runTime * params.accel) * sBoost;
       const next = pathT + speed * dt;
       if (next >= 1) {
         // bouclage : on ré-amorce la traînée au départ pour éviter
@@ -684,6 +691,7 @@ function tick() {
         s.collected = true; s.popT = 0;
         s.startY = s.mesh.position.y;          // part de sa hauteur actuelle (pas de saut)
         emissionBoostT = EMISSION_BOOST_DUR;   // flash d'émission du perso
+        speedBoostT = params.speedBoostDur;    // petite accélération
         traveler.triggerPulse();               // onde de turbulence sur les splines
         if (colorMode) {                       // le perso prend la couleur de la sphère
           const hex = sphereColorHex(s);
