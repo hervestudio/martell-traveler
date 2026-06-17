@@ -119,7 +119,7 @@ const params = {
   sphFloatSpeed: 0.8,   // vitesse de la flottaison
   sphMode:       'émissif',          // 'émissif' | 'métallisé' | 'specular'
   // 3 couleurs émissives
-  emColor1: '#c99e54', emColor2: '#a82d00', emColor3: '#285af0',
+  emColor1: '#c99e54', emColor2: '#a82d00', emColor3: '#c99e54',
   sphEmissive: 1.75,
   // 3 couleurs métallisées
   metColor1: '#feca62', metColor2: '#a60707', metColor3: '#feca62',
@@ -383,6 +383,7 @@ function makeSphereMaterial(ci) {
   const common = {
     transparent, opacity: params.sphOpacity,
     transmission: params.sphTransmission, thickness: params.sphPhysThickness, ior: 1.25,
+    flatShading: ci === 1,   // icosaèdre rouge -> facettes visibles
   };
   if (params.sphMode === 'métallisé') {
     const cols = [params.metColor1, params.metColor2, params.metColor3];
@@ -434,11 +435,15 @@ function buildSpheres() {
       base.y += params.sphElevation;                         // à l'écart -> manquée
     }
     const ci = i % 3;
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 20), makeSphereMaterial(ci));
+    // couleur 1 (rouge) -> icosaèdre à 20 faces ; sinon sphère
+    const geo = ci === 1 ? new THREE.IcosahedronGeometry(1, 0) : new THREE.SphereGeometry(1, 28, 20);
+    const mesh = new THREE.Mesh(geo, makeSphereMaterial(ci));
     mesh.position.copy(base);
     mesh.layers.enable(BLOOM_CHAR);   // les sphères lumineuses bloom avec le perso
     sphereGroup.add(mesh);
-    spheres.push({ mesh, base, phase: i * 1.7, ci, collectable, collected: false, popT: 0 });
+    // les icosaèdres (rouge) sont un peu plus gros (0.3 vs 0.25 par défaut)
+    const sizeMul = ci === 1 ? 1.2 : 1.0;
+    spheres.push({ mesh, base, phase: i * 1.7, ci, sizeMul, collectable, collected: false, popT: 0 });
   }
   collectableCount = spheres.filter(s => s.collectable).length;
 }
@@ -670,14 +675,14 @@ function tick() {
         // depuis sa hauteur actuelle -> pas de redescente.
         s.popT = Math.min(1, s.popT + dt * 2);   // gonflement ralenti (dt*2)
         const e = easeOutCubic(s.popT);
-        s.mesh.scale.setScalar(Math.max(0, params.sphSize * (1 - e)));
+        s.mesh.scale.setScalar(Math.max(0, params.sphSize * s.sizeMul * (1 - e)));
         s.mesh.position.set(s.base.x, s.startY + e * 3, s.base.z);
         if (s.popT >= 1) s.mesh.visible = false;
         collected++;
         continue;
       }
       // respiration (échelle) + flottaison constante (Y), tout en sinus (lissé)
-      s.mesh.scale.setScalar(params.sphSize * (1 + ba * Math.sin(time * bs + s.phase)));
+      s.mesh.scale.setScalar(params.sphSize * s.sizeMul * (1 + ba * Math.sin(time * bs + s.phase)));
       s.mesh.position.set(
         s.base.x,
         s.base.y + params.sphFloatAmp * Math.sin(time * params.sphFloatSpeed + s.phase),
