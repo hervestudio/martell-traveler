@@ -7,7 +7,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
-import { Traveler } from './traveler.js';
+import { Traveler } from './traveler.js?v=2';
 
 const UP_VEC = new THREE.Vector3(0, 1, 0);
 
