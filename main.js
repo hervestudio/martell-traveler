@@ -90,8 +90,9 @@ const params = {
   pulseDur:    0.5,    // turbulence : durée/vitesse (plus grand = plus lent)
   pulseWidth:  0.3,    // turbulence : largeur du renflement
   growDur:     3.0,    // durée d'apparition d'une nouvelle ligne (s)
-  speedBoost:  0.4,    // accélération à la récupération (surplus relatif)
-  speedBoostDur: 1.5,  // durée de l'accélération (s)
+  speedBoost:  0.4,    // accélération (boule jaune) — surplus relatif
+  speedMalus:  0.35,   // ralentissement (icosaèdre rouge) — réduction relative
+  speedBoostDur: 1.5,  // durée de l'effet de vitesse (s)
 
   // --- Personnage : placement (décalage par rapport au chemin) ---
   offsetX:     0.0,
@@ -103,7 +104,8 @@ const params = {
   thickness: 0.05,     // épaisseur de départ des filaments (unités monde)
   thicknessMax: 0.1,   // épaisseur atteinte quand toutes les sphères sont récupérées
   emission:  1.0,      // intensité d'émission des filaments
-  emissionBoost: 1.7,  // surplus d'émission quand le perso mange une sphère
+  emissionBoost: 1.7,  // surplus d'émission (boule jaune)
+  emissionMalus: 0.0,  // émission abaissée (malus, icosaèdre rouge)
   glowChar:   0.3,     // force du bloom du personnage
   glowCharRadius: 0.2,
   exposure:  0.85,
@@ -146,9 +148,11 @@ const params = {
 let pathT = 0;
 let runTime = 0;
 let snapCam = false;
-let emissionBoostT = 0;   // temps restant du boost d'émission (récupération)
-const EMISSION_BOOST_DUR = 0.3;
-let speedBoostT = 0;      // temps restant du boost de vitesse (récupération)
+let emissionBoostT = 0;   // temps restant du boost d'émission (boule jaune)
+let emissionMalusT = 0;   // temps restant du malus d'émission (icosaèdre rouge)
+const EMISSION_FX_DUR = 0.3;
+let speedBoostT = 0;      // temps restant du boost de vitesse (boule jaune)
+let speedMalusT = 0;      // temps restant du ralentissement (icosaèdre rouge)
 
 // ============================================================
 //  Ciel dégradé
@@ -375,7 +379,8 @@ primeCharacter();
 const sphereGroup = new THREE.Group();
 scene.add(sphereGroup);
 let spheres = [];
-let collectableCount = 0;   // nb de sphères atteignables (pour l'épaisseur des fils)
+let collectableCount = 0;        // nb d'éléments atteignables (toutes couleurs)
+let collectableYellowCount = 0;  // nb de jaunes atteignables (pour la progression du perso)
 const _side = new THREE.Vector3();
 
 function makeSphereMaterial(ci) {
@@ -446,6 +451,7 @@ function buildSpheres() {
     spheres.push({ mesh, base, phase: i * 1.7, ci, sizeMul, collectable, collected: false, popT: 0 });
   }
   collectableCount = spheres.filter(s => s.collectable).length;
+  collectableYellowCount = spheres.filter(s => s.collectable && s.ci !== 1).length;
 }
 function updateSphereMaterials() {
   for (const s of spheres) { s.mesh.material.dispose(); s.mesh.material = makeSphereMaterial(s.ci); }
@@ -536,8 +542,9 @@ fAtt.add(params, 'pulseAmp', 0, 2, 0.05).name('turbulence ampl.').onChange(v => 
 fAtt.add(params, 'pulseDur', 0.2, 3, 0.05).name('turbulence durée').onChange(v => traveler.pulseDur = v);
 fAtt.add(params, 'pulseWidth', 0.05, 0.6, 0.01).name('turbulence largeur').onChange(v => traveler.pulseWidth = v);
 fAtt.add(params, 'growDur', 0.1, 5, 0.05).name('apparition fil (s)').onChange(v => traveler.growDur = v);
-fAtt.add(params, 'speedBoost', 0, 3, 0.05).name('accél. récup.');
-fAtt.add(params, 'speedBoostDur', 0.1, 2, 0.05).name('accél. durée (s)');
+fAtt.add(params, 'speedBoost', 0, 3, 0.05).name('accél. (jaune)');
+fAtt.add(params, 'speedMalus', 0, 1, 0.05).name('ralentiss. (rouge)');
+fAtt.add(params, 'speedBoostDur', 0.1, 2, 0.05).name('effet vitesse durée (s)');
 
 const fPos = gui.addFolder('Personnage — placement');
 fPos.add(params, 'offsetX', -12, 12, 0.1).name('décalage X');
@@ -549,7 +556,8 @@ fVis.addColor(params, 'color').name('couleur').onChange(v => traveler.setColor(v
 fVis.add(params, 'thickness', 0.02, 0.4, 0.01).name('épaisseur départ');
 fVis.add(params, 'thicknessMax', 0.02, 0.6, 0.01).name('épaisseur max');
 fVis.add(params, 'emission', 0, 3, 0.05).name('émission');
-fVis.add(params, 'emissionBoost', 0, 3, 0.05).name('boost (récup.)');
+fVis.add(params, 'emissionBoost', 0, 3, 0.05).name('boost (jaune)');
+fVis.add(params, 'emissionMalus', 0, 1, 0.05).name('malus émission (rouge)');
 fVis.add(params, 'glowChar', 0, 3, 0.05).name('glow perso').onChange(v => bloomChar.strength = v);
 fVis.add(params, 'glowCharRadius', 0, 2, 0.05).name('rayon glow perso').onChange(v => bloomChar.radius = v);
 fVis.add(params, 'exposure', 0.4, 2, 0.05).name('exposition').onChange(v => renderer.toneMappingExposure = v);
@@ -634,8 +642,11 @@ function tick() {
     if (!paused) {
       runTime += dt;
       if (speedBoostT > 0) speedBoostT = Math.max(0, speedBoostT - dt);
-      const sBoost = 1 + params.speedBoost * (speedBoostT / params.speedBoostDur);  // accélération récup.
-      const speed = Math.min(params.maxSpeed, params.startSpeed + runTime * params.accel) * sBoost;
+      if (speedMalusT > 0) speedMalusT = Math.max(0, speedMalusT - dt);
+      let sMul = 1;
+      if (speedBoostT > 0) sMul = 1 + params.speedBoost * (speedBoostT / params.speedBoostDur);      // accél. (jaune)
+      else if (speedMalusT > 0) sMul = 1 - params.speedMalus * (speedMalusT / params.speedBoostDur); // ralenti (rouge)
+      const speed = Math.min(params.maxSpeed, params.startSpeed + runTime * params.accel) * Math.max(0.05, sMul);
       const next = pathT + speed * dt;
       if (next >= 1) {
         // bouclage : on ré-amorce la traînée au départ pour éviter
@@ -668,9 +679,10 @@ function tick() {
     const bs = params.sphBreathSpeed, ba = params.sphBreathAmp;
     const PICK_H = 0.8;           // tolérance horizontale (serrée -> rate celles à l'écart)
     const PICK_V = 1.6;           // tolérance verticale (large -> encaisse le flottement)
-    let collected = 0;
+    let collected = 0, collectedYellow = 0;
     for (const s of spheres) {
       if (s.collected) {
+        if (s.ci !== 1) collectedYellow++;
         // disparition : monte vers son point le plus haut (easeOut) en scalant à 0,
         // depuis sa hauteur actuelle -> pas de redescente.
         s.popT = Math.min(1, s.popT + dt * 2);   // gonflement ralenti (dt*2)
@@ -695,10 +707,15 @@ function tick() {
       if (Math.hypot(dx, dz) < PICK_H && Math.abs(dy) < PICK_V) {
         s.collected = true; s.popT = 0;
         s.startY = s.mesh.position.y;          // part de sa hauteur actuelle (pas de saut)
-        emissionBoostT = EMISSION_BOOST_DUR;   // flash d'émission du perso
-        speedBoostT = params.speedBoostDur;    // petite accélération
-        traveler.triggerPulse();               // onde de turbulence sur les splines
-        if (colorMode) {                       // le perso prend la couleur de la sphère
+        traveler.triggerPulse();               // onde de turbulence (réaction physique)
+        if (s.ci === 1) {                      // icosaèdre rouge -> MALUS (émission + ralenti)
+          emissionMalusT = EMISSION_FX_DUR;
+          speedMalusT = params.speedBoostDur;
+        } else {                               // boule jaune -> BOOST (émission + accél.)
+          emissionBoostT = EMISSION_FX_DUR;
+          speedBoostT = params.speedBoostDur;
+        }
+        if (colorMode) {                       // le perso prend la couleur de l'élément
           const hex = sphereColorHex(s);
           traveler.setColor(hex);
           colorSwitch.style.background = hex;  // la piste reflète la couleur prise
@@ -708,15 +725,22 @@ function tick() {
     if (scoreEl) scoreEl.textContent = `Sphères : ${collected} / ${spheres.length}`;
 
     // progression : 1 spline fine au départ -> elle grossit -> 2e spline -> ...
-    // jusqu'à 5 splines à l'épaisseur max, au fil des sphères récupérées.
-    const frac = collectableCount ? Math.min(1, collected / collectableCount) : 0;
+    // jusqu'à 5 splines à l'épaisseur max. Basée UNIQUEMENT sur les jaunes mangées
+    // (les icosaèdres rouges ne font pas grandir/épaissir le perso).
+    const frac = collectableYellowCount ? Math.min(1, collectedYellow / collectableYellowCount) : 0;
     traveler.setFilamentCount(1 + Math.floor(frac * 5));   // 1..5 par paliers
     traveler.setThickness(params.thickness + (params.thicknessMax - params.thickness) * frac);
 
-    // émission du perso : +boost pendant 0.3 s après une récupération, puis retour
+    // émission du perso : boost (jaune) ou malus (rouge) pendant 0.3 s, puis retour
     if (emissionBoostT > 0) emissionBoostT = Math.max(0, emissionBoostT - dt);
-    const boost = params.emissionBoost * (emissionBoostT / EMISSION_BOOST_DUR);
-    traveler.setIntensity(params.emission + boost);
+    if (emissionMalusT > 0) emissionMalusT = Math.max(0, emissionMalusT - dt);
+    let em = params.emission;
+    if (emissionBoostT > 0) {
+      em = params.emission + params.emissionBoost * (emissionBoostT / EMISSION_FX_DUR);
+    } else if (emissionMalusT > 0) {
+      em = params.emission + (params.emissionMalus - params.emission) * (emissionMalusT / EMISSION_FX_DUR);
+    }
+    traveler.setIntensity(em);
 
     // caméra de suivi
     if (followCam) {
